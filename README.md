@@ -1,4 +1,6 @@
-## Redis Exploit Automation Script
+<a href="https://www.buymeacoffee.com/0xDTC"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a knowledge&emoji=📖&slug=0xDTC&button_colour=FF5F5F&font_colour=ffffff&font_family=Comic&outline_colour=000000&coffee_colour=FFDD00" /></a>
+
+# Redis Exploit Automation Script
 
 This script is designed for penetration testers and ethical hackers to exploit Redis misconfigurations. It automates tasks such as injecting custom web shells, dumping the Redis database, and injecting SSH keys for privilege escalation.
 
