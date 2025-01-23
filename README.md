@@ -1,14 +1,14 @@
 <a href="https://www.buymeacoffee.com/0xDTC"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a knowledge&emoji=📖&slug=0xDTC&button_colour=FF5F5F&font_colour=ffffff&font_family=Comic&outline_colour=000000&coffee_colour=FFDD00" /></a>
 
-> [! Notice] Project is under development not fully working.
+# Notice: Project is under development not fully working.
 
-# Redis Exploit Automation Script
+## Redis Exploit Automation Script
 
 This script is designed for penetration testers and ethical hackers to exploit Redis misconfigurations. It automates tasks such as injecting custom web shells, dumping the Redis database, and injecting SSH keys for privilege escalation.
 
 ---
 
-## Features
+### Features
 1. **Redis Connectivity Check**:
    - Verifies if the target Redis server is reachable.
    - Supports authentication if required.
@@ -28,7 +28,7 @@ This script is designed for penetration testers and ethical hackers to exploit R
 
 ---
 
-## Requirements
+### Requirements
 - **Dependencies**:
   - `redis-cli`: To interact with the Redis server.
   - `curl`: To fetch reverse shell payloads if needed.
@@ -42,7 +42,7 @@ sudo apt install redis-tools curl net-tools
 
 ---
 
-## Usage
+### Usage
 1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/redis-exploit-script.git
@@ -64,7 +64,7 @@ sudo apt install redis-tools curl net-tools
 
 ---
 
-## Menu Options
+### Menu Options
 1. **Inject a Custom Web Shell**:
    - Prompts the user to input a shell command.
    - Example: A reverse shell payload such as:
@@ -85,7 +85,7 @@ sudo apt install redis-tools curl net-tools
 
 ---
 
-## Examples
+### Examples
 - **Run Script Without Authentication**:
   ```bash
   ./redis_exploit.sh 192.168.1.10 6379
@@ -98,7 +98,7 @@ sudo apt install redis-tools curl net-tools
 
 ---
 
-## Notes
+### Notes
 - Ensure you have a Netcat listener running for reverse shells:
   ```bash
   nc -lvnp <your-port>
@@ -108,7 +108,7 @@ sudo apt install redis-tools curl net-tools
 
 ---
 
-## Disclaimer
+### Disclaimer
 This script is intended for legal and ethical use only. Ensure you have explicit permission before testing or exploiting any Redis server. Misuse of this script may lead to legal consequences.
 
 ---
